@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
-	"encoding/hex"
+
+	"github.com/cristiandonosoc/computer_enhance/internal/nasm"
 )
 
 func internalMain() error {
@@ -12,9 +14,10 @@ func internalMain() error {
 	}
 
 	path := os.Args[1]
-	data, err := os.ReadFile(path)
+
+	data, err := nasm.RunNasm(path)
 	if err != nil {
-		return fmt.Errorf("reading %q: %w", path, err)
+		return fmt.Errorf("running nasm on %q: %w", path, err)
 	}
 
 	hs := hex.EncodeToString(data)
