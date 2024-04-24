@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/cristiandonosoc/computer_enhance/internal/nasm"
+	"github.com/cristiandonosoc/computer_enhance/pkg/intel8086"
 )
-
 
 func internalMain() error {
 	if len(os.Args) != 2 {
@@ -21,14 +21,26 @@ func internalMain() error {
 		return fmt.Errorf("running nasm on %q: %w", path, err)
 	}
 
-	for i, b := range data {
-		fmt.Printf("BYTE %03d: %08b\n", i, b)
-	}
-
 	hs := hex.EncodeToString(data)
 	fmt.Println(hs)
 
-	return fmt.Errorf("TODO: Conversion!")
+	fmt.Println("--------------------------")
+
+	instructions, err := intel8086.ParseInstructions(data)
+	if err != nil {
+		return fmt.Errorf("parsing instructions: %w", err)
+	}
+
+	for _, instruction := range instructions {
+		str, err := instruction.Print()
+		if err != nil {
+			return fmt.Errorf("printing instruction: %w", err)
+		}
+
+		fmt.Println("INSTRUCTION:", str)
+	}
+
+	return nil
 }
 
 func main() {
