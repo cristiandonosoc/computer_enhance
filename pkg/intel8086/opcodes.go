@@ -7,27 +7,30 @@ import (
 	"github.com/cristiandonosoc/computer_enhance/internal/bytes"
 )
 
-type OpcodeHandler func(b1, b2 byte, bs *bytes.ByteStream) (*Instruction, error)
+type OpcodeDecoderFunc func(b1, b2 byte, bs *bytes.ByteStream) (Instruction, error)
 
-type Opcode struct {
-	Name    string
-	Opcode  byte
-	Length  int
-	Handler OpcodeHandler
+type OpcodeHandler struct {
+	Name         string
+	Opcode       byte
+	OpcodeLength int
+	Handler      OpcodeDecoderFunc
 }
 
 var (
-	kOpcodes = []*Opcode{
+	// This are all the opcodes supported by our disassembler.
+	// The length will be calculated at the package init function.
+	kOpcodeHandlers = []*OpcodeHandler{
 		{
-			Name:   "Register/memory to/from register",
-			Opcode: 0b100010,
+			Name:    "Register/memory to/from register",
+			Opcode:  0b100010,
+			Handler: opcodeHandler_RegisterMemoryToFromRegister,
 		},
 		{
-			Name: "Immediate to register/memory",
+			Name:   "Immediate to register/memory",
 			Opcode: 0b1100011,
 		},
 		{
-			Name: "Immediate to register",
+			Name:   "Immediate to register",
 			Opcode: 0b1011,
 		},
 	}
@@ -35,27 +38,27 @@ var (
 
 func init() {
 	// Calculate the length of all the defined opcodes.
-	for _, opcode := range kOpcodes {
-		opcode.Length = calculateOpcodeLength(opcode.Opcode)
+	for _, oh := range kOpcodeHandlers {
+		oh.OpcodeLength = calculateOpcodeLength(oh.Opcode)
 	}
 }
 
-// OpcodeDecoder -----------------------------------------------------------------------------------
+// OpcodeRegistry -----------------------------------------------------------------------------------
 
-type OpcodeDecoder struct {
-	Opcodes []*Opcode
+type OpcodeRegistry struct {
+	Opcodes []*OpcodeHandler
 }
 
-var kOpcodeDecoder *OpcodeDecoder
+var kOpcodeRegistry *OpcodeRegistry
 
-func GlobalOpcodeDecoder() *OpcodeDecoder {
-	if kOpcodeDecoder != nil {
-		return kOpcodeDecoder
+func GlobalOpcodeRegistry() *OpcodeRegistry {
+	if kOpcodeRegistry != nil {
+		return kOpcodeRegistry
 	}
 
-	od := &OpcodeDecoder{}
-	od.Opcodes = make([]*Opcode, 0, len(kOpcodes))
-	od.Opcodes = append(od.Opcodes, kOpcodes...)
+	od := &OpcodeRegistry{}
+	od.Opcodes = make([]*OpcodeHandler, 0, len(kOpcodeHandlers))
+	od.Opcodes = append(od.Opcodes, kOpcodeHandlers...)
 
 	// Sort opcodes by value.
 	sort.Slice(od.Opcodes, func(i, j int) bool {
@@ -63,13 +66,13 @@ func GlobalOpcodeDecoder() *OpcodeDecoder {
 	})
 
 	// Set the global pointer.
-	kOpcodeDecoder = od
-	return kOpcodeDecoder
+	kOpcodeRegistry = od
+	return kOpcodeRegistry
 }
 
-func (od *OpcodeDecoder) FindOpcode(b byte) (*Opcode, error) {
+func (od *OpcodeRegistry) FindOpcodeHandler(b byte) (*OpcodeHandler, error) {
 	for _, opcode := range od.Opcodes {
-		shift := 8 - opcode.Length
+		shift := 8 - opcode.OpcodeLength
 		candidateOpcode := b >> shift
 		if candidateOpcode == opcode.Opcode {
 			return opcode, nil

@@ -8,10 +8,10 @@ import (
 	"github.com/cristiandonosoc/computer_enhance/internal/bytes"
 )
 
-func ParseInstructions(asm []byte) ([]*Instruction, error) {
+func ParseInstructions(asm []byte) ([]Instruction, error) {
 	bs := bytes.NewByteStream(asm)
 
-	var instructions []*Instruction
+	var instructions []Instruction
 	for !bs.IsEOF() {
 		instruction, err := ParseInstruction(bs)
 		if err != nil {

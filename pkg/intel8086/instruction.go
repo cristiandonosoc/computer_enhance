@@ -12,93 +12,45 @@ const (
 	InstructionKind_MOV InstructionKind = 0b00100010
 )
 
+type InstructionData struct {
+	W   bool
+	D   bool
+	MOD byte
+	REG byte
+	RM  byte
+}
+
 type Instruction interface {
-	Opcode() *Opcode
 	Bytes() []byte
-
-	W() bool
-	D() bool
-	MOD() byte
-	REG() byte
-	RM() byte
-
+	Data() InstructionData
 	String() string
 }
 
-// 	Kind       InstructionKind
-// type Instruction struct {
-// 	B1         byte
-// 	B2         byte
-// 	ExtraBytes []byte
-// }
+func ParseInstruction(bs *bytes.ByteStream) (Instruction, error) {
+	if bs.IsEOF() {
+		return nil, fmt.Errorf("stream EOF at byte 1")
+	}
+	b1 := bs.Advance()
 
-// func (i *Instruction) Opcode() byte {
-// 	return (i.B1 >> 2) & 0b00111111
-// }
+	if bs.IsEOF() {
+		return nil, fmt.Errorf("stream EOF at byte 2")
+	}
+	b2 := bs.Advance()
 
-// func (i *Instruction) W() bool {
-// 	return (i.B1 & 0b1) == 1
-// }
-
-// func (i *Instruction) D() bool {
-// 	return (i.B1 & 0b01) == 1
-// }
-
-// func (i *Instruction) MOD() byte {
-// 	return (i.B2 >> 6) & 0b11
-// }
-
-// func (i *Instruction) REG() byte {
-// 	return (i.B2 >> 3) & 0b111
-// }
-
-// func (i *Instruction) RM() byte {
-// 	return i.B2 & 0b111
-// }
-
-// func (i *Instruction) Print() (string, error) {
-// 	switch kind := i.Kind; kind {
-// 	case InstructionKind_MOV:
-// 		return printMOV(i)
-// 	default:
-// 		return "", fmt.Errorf("unsupported kind: %v", kind)
-// 	}
-// }
-
-func ParseInstruction(bs *bytes.ByteStream) (*Instruction, error) {
-	return nil, nil
-	// if bs.IsEOF() {
-	// 	return nil, fmt.Errorf("stream EOF at byte 1")
-	// }
-	// b1 := bs.Advance()
-
-	// if bs.IsEOF() {
-	// 	return nil, fmt.Errorf("stream EOF at byte 2")
-	// }
-	// b2 := bs.Advance()
-
-
-
-	// switch opcode := i.Opcode(); opcode {
-	// case byte(InstructionKind_MOV):
-	// 	i.Kind = InstructionKind_MOV
-	// default:
-	// 	return nil, fmt.Errorf("unknown opcode %08b", opcode)
-	// }
-
-	// return i, nil
-}
-
-// MOV ----------------------------------------------------------------------------------------------
-
-func printMOV(i Instruction) (string, error) {
-	if i.MOD() != 0b11 {
-		return "", fmt.Errorf("only register mode supported for now")
+	or := GlobalOpcodeRegistry()
+	oh, err := or.FindOpcodeHandler(b1)
+	if err != nil {
+		return nil, fmt.Errorf("finding opcode handler: %w", err)
 	}
 
-	w := i.W()
-	dst := InterpretRegister(i.RM(), w)
-	src := InterpretRegister(i.REG(), w)
+	if oh.Handler == nil {
+		return nil, fmt.Errorf("opcode handler for %q (%08b) not defined!", oh.Name, oh.Opcode)
+	}
 
-	return fmt.Sprintf("mov %s, %s", dst, src), nil
+	instruction, err := oh.Handler(b1, b2, bs)
+	if err != nil {
+		return nil, fmt.Errorf("handling opcode %q (%08b): %w", oh.Name, oh.Opcode, err)
+	}
+
+	return instruction, nil
 }

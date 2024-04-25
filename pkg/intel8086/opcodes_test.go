@@ -93,13 +93,9 @@ func TestFindOpcode(t *testing.T) {
 		},
 	}
 
-	od := GlobalOpcodeDecoder()
-	for _, opcode := range od.Opcodes {
-		t.Logf("OPCODE: %08b, LENGTH: %d\n", opcode.Opcode, opcode.Length)
-	}
-
+	or := GlobalOpcodeRegistry()
 	for i, testcase := range testcases {
-		got, err := od.FindOpcode(testcase.b)
+		got, err := or.FindOpcodeHandler(testcase.b)
 
 		if testcase.wantErr != "" {
 			if assert.Error(t, err, "testcase %d", i) {
@@ -110,6 +106,9 @@ func TestFindOpcode(t *testing.T) {
 
 		if assert.NoError(t, err, "testcase %d", i) {
 			assert.Contains(t, got.Name, testcase.wantName, "testcase %d", i)
+
+			wantOpcode := testcase.b >> (8 - got.OpcodeLength)
+			assert.Equal(t, wantOpcode, got.Opcode)
 		}
 	}
 }
