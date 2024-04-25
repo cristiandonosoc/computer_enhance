@@ -1,6 +1,12 @@
 // Package bytes holds utilities for working with bytes.
 package bytes
 
+func ToUint16(b1, b2 byte) uint16 {
+	return uint16(b1) | (uint16(b2) << 8)
+}
+
+// ByteStream --------------------------------------------------------------------------------------
+
 // ByteStream is a helper data structure to treat a an array of bytes as a stream.
 type ByteStream struct {
 	Data []byte

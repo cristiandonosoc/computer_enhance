@@ -30,8 +30,9 @@ var (
 			Opcode: 0b1100011,
 		},
 		{
-			Name:   "Immediate to register",
-			Opcode: 0b1011,
+			Name:    "Immediate to register",
+			Opcode:  0b1011,
+			Handler: opcodeHandler_ImmediateToRegister,
 		},
 	}
 )
