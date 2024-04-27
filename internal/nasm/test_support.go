@@ -7,11 +7,12 @@ import (
 
 	"github.com/cristiandonosoc/computer_enhance/pkg/intel8086"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func RunNasmTest(t *testing.T, asmFile string) {
-	wantData, err := RunNasm(asmFile)
+	wantData, originalAsm, err := RunNasm(asmFile)
 	require.NoError(t, err)
 
 	instructions, err := intel8086.ParseInstructions(wantData)
@@ -31,8 +32,16 @@ func RunNasmTest(t *testing.T, asmFile string) {
 	require.NoError(t, err)
 
 	// Run asm on that file.
-	gotData, err := RunNasm(tmpFile)
+	gotData, gotAsm, err := RunNasm(tmpFile)
 	require.NoError(t, err)
 
-	require.Equal(t, wantData, gotData)
+	if !assert.Equal(t, wantData, gotData) {
+		t.Log("ORIGINAL ASM --------------------------------------------------------------------------")
+		t.Log("\n" + originalAsm)
+		t.Log("ORIGINAL ASM --------------------------------------------------------------------------")
+
+		t.Log("GENERATED ASM -------------------------------------------------------------------------")
+		t.Log("\n" + gotAsm)
+		t.Log("GENERATED ASM -------------------------------------------------------------------------")
+	}
 }

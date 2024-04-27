@@ -7,7 +7,7 @@ import (
 	"github.com/cristiandonosoc/computer_enhance/internal/bytes"
 )
 
-type OpcodeDecoderFunc func(b1, b2 byte, bs *bytes.ByteStream) (Instruction, error)
+type OpcodeDecoderFunc func(oh *OpcodeHandler, b1, b2 byte, bs *bytes.ByteStream) (Instruction, error)
 
 type OpcodeHandler struct {
 	Name         string

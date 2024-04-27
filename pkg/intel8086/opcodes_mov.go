@@ -6,32 +6,12 @@ import (
 	"github.com/cristiandonosoc/computer_enhance/internal/bytes"
 )
 
-type genericInstruction struct {
-	data          InstructionData
-	internalBytes []byte
-	printFunc     func(gi *genericInstruction) string
-}
-
-var _ Instruction = (*genericInstruction)(nil)
-
-func (gi *genericInstruction) Bytes() []byte {
-	return gi.internalBytes
-}
-
-func (gi *genericInstruction) Data() InstructionData {
-	return gi.data
-}
-
-func (gi *genericInstruction) String() string {
-	return gi.printFunc(gi)
-}
-
 // Register/memory to/from register ----------------------------------------------------------------
 
-func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStream) (Instruction, error) {
+func opcodeHandler_RegisterMemoryToFromRegister(oh *OpcodeHandler, b1, b2 byte, bs *bytes.ByteStream) (Instruction, error) {
 	data := InstructionData{
-		W:   (b1 & 0b1) > 0,
 		D:   (b1 & 0b10) > 0,
+		W:   (b1 & 0b1) > 0,
 		MOD: (b2 >> 6) & 0b11,
 		REG: (b2 >> 3) & 0b111,
 		RM:  b2 & 0b111,
@@ -47,6 +27,8 @@ func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStrea
 				return nil, fmt.Errorf("mod 00: %w", err)
 			}
 			internalBytes = []byte{b1, b2, b3, b4}
+		} else {
+			internalBytes = []byte{b1, b2}
 		}
 	case 0b01:
 		b3, err := bs.ReadByte()
@@ -60,6 +42,8 @@ func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStrea
 			return nil, fmt.Errorf("mod 10: %w", err)
 		}
 		internalBytes = []byte{b1, b2, b3, b4}
+	case 0b11:
+		internalBytes = []byte{b1, b2}
 	}
 
 	printFunc := func(gi *genericInstruction) string {
@@ -71,8 +55,13 @@ func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStrea
 
 		switch gi.data.MOD {
 		case 0b00:
-			dst := InterpretREG(gi.data.REG, gi.data.W)
-			return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, 0))
+			if eac != EAC_DirectAddress {
+				dst := InterpretREG(gi.data.REG, gi.data.W)
+				return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, 0))
+			} else {
+				src := InterpretREG(gi.data.REG, gi.data.W)
+				return fmt.Sprintf("mov %s, %s", ToEACNotation(eac, 0), src)
+			}
 		case 0b01:
 			dst := InterpretREG(gi.data.REG, gi.data.W)
 			return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, uint16(gi.internalBytes[2])))
@@ -85,20 +74,20 @@ func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStrea
 			src := InterpretREG(gi.data.REG, gi.data.W)
 			return fmt.Sprintf("mov %s, %s", dst, src)
 		}
-
 		panic(fmt.Sprintf("invalid mod value %08b", gi.data.MOD))
 	}
 
 	return &genericInstruction{
 		data:          data,
 		internalBytes: internalBytes,
-		printFunc:     printFunc,
+		printFunc:     wrapPrintFunc(printFunc),
+		oh:            oh,
 	}, nil
 }
 
 // Immediate to Register ---------------------------------------------------------------------------
 
-func opcodeHandler_ImmediateToRegister(b1, b2 byte, bs *bytes.ByteStream) (Instruction, error) {
+func opcodeHandler_ImmediateToRegister(oh *OpcodeHandler, b1, b2 byte, bs *bytes.ByteStream) (Instruction, error) {
 	data := InstructionData{
 		W:   ((b1 >> 3) & 0b1) > 0,
 		REG: (b1 & 0b111),
@@ -132,6 +121,7 @@ func opcodeHandler_ImmediateToRegister(b1, b2 byte, bs *bytes.ByteStream) (Instr
 	return &genericInstruction{
 		data:          data,
 		internalBytes: internalBytes,
-		printFunc:     printFunc,
+		printFunc:     wrapPrintFunc(printFunc),
+		oh:            oh,
 	}, nil
 }

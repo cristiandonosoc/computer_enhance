@@ -10,41 +10,50 @@ import (
 	"github.com/cristiandonosoc/golib/pkg/files"
 )
 
-func RunNasm(input string) ([]byte, error) {
+func RunNasm(input string) (_byteAsm []byte, _asm string, _err error) {
+	// Read the input.
+	asmInput, err := os.ReadFile(input)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading input: %w", err)
+	}
+
 	pwd, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("getting pwd: %w", err)
+		return nil, "", fmt.Errorf("getting pwd: %w", err)
 	}
 
 	rootDir, err := findRootDir(pwd)
 	if err != nil {
-		return nil, fmt.Errorf("searching for root dir: %w", err)
+		return nil, "", fmt.Errorf("searching for root dir: %w", err)
 	}
 
 	nasm, err := findNasm(rootDir)
 	if err != nil {
-		return nil, fmt.Errorf("finding nasm: %w", err)
+		return nil, "", fmt.Errorf("finding nasm: %w", err)
 	}
 
 	tmp, err := os.MkdirTemp("", "nasm")
 	if err != nil {
-		return nil, fmt.Errorf("creating temp dir: %w", err)
+		return nil, "", fmt.Errorf("creating temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmp)
 
 	output := filepath.Join(tmp, "output")
 	cmd := exec.Command(nasm, "-o", output, input)
 
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("running %v: %w", cmd.Args, err)
+		return nil, "", fmt.Errorf("running %v: %w", cmd.Args, err)
 	}
 
 	data, err := os.ReadFile(output)
 	if err != nil {
-		return nil, fmt.Errorf("reading output at %q: %w", output, err)
+		return nil, "", fmt.Errorf("reading output at %q: %w", output, err)
 	}
 
-	return data, nil
+	return data, string(asmInput), nil
 }
 
 const (
