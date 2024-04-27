@@ -29,32 +29,69 @@ func (gi *genericInstruction) String() string {
 // Register/memory to/from register ----------------------------------------------------------------
 
 func opcodeHandler_RegisterMemoryToFromRegister(b1, b2 byte, bs *bytes.ByteStream) (Instruction, error) {
-	mod := (b2 >> 6) & 0b11
+	data := InstructionData{
+		W:   (b1 & 0b1) > 0,
+		D:   (b1 & 0b10) > 0,
+		MOD: (b2 >> 6) & 0b11,
+		REG: (b2 >> 3) & 0b111,
+		RM:  b2 & 0b111,
+	}
 
-	if mod != 0b11 {
-		return nil, fmt.Errorf("only register mode is supported for now")
+	var internalBytes []byte
+	switch data.MOD {
+	case 0b00:
+		// Check for direct addressing mode.
+		if data.RM == 0b110 {
+			b3, b4, err := bs.ReadWordAsBytes()
+			if err != nil {
+				return nil, fmt.Errorf("mod 00: %w", err)
+			}
+			internalBytes = []byte{b1, b2, b3, b4}
+		}
+	case 0b01:
+		b3, err := bs.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("mod 01: %w", err)
+		}
+		internalBytes = []byte{b1, b2, b3}
+	case 0b10:
+		b3, b4, err := bs.ReadWordAsBytes()
+		if err != nil {
+			return nil, fmt.Errorf("mod 10: %w", err)
+		}
+		internalBytes = []byte{b1, b2, b3, b4}
 	}
 
 	printFunc := func(gi *genericInstruction) string {
+		// Check for the Effective Address Calculation.
+		var eac EAC = EAC_Invalid
 		if gi.data.MOD != 0b11 {
-			panic("only register mode supported for now")
+			eac = InterpretRM(gi.data.RM, gi.data.MOD)
 		}
 
-		dst := InterpretRegister(gi.data.RM, gi.data.W)
-		src := InterpretRegister(gi.data.REG, gi.data.W)
+		switch gi.data.MOD {
+		case 0b00:
+			dst := InterpretREG(gi.data.REG, gi.data.W)
+			return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, 0))
+		case 0b01:
+			dst := InterpretREG(gi.data.REG, gi.data.W)
+			return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, uint16(gi.internalBytes[2])))
+		case 0b10:
+			dst := InterpretREG(gi.data.REG, gi.data.W)
+			offset := bytes.ToUint16(gi.internalBytes[2], gi.internalBytes[3])
+			return fmt.Sprintf("mov %s, %s", dst, ToEACNotation(eac, offset))
+		case 0b11:
+			dst := InterpretREG(gi.data.RM, gi.data.W)
+			src := InterpretREG(gi.data.REG, gi.data.W)
+			return fmt.Sprintf("mov %s, %s", dst, src)
+		}
 
-		return fmt.Sprintf("mov %s, %s", dst, src)
+		panic(fmt.Sprintf("invalid mod value %08b", gi.data.MOD))
 	}
 
 	return &genericInstruction{
-		data: InstructionData{
-			W:   (b1 & 0b1) > 0,
-			D:   (b1 & 0b10) > 0,
-			MOD: mod,
-			REG: (b2 >> 3) & 0b111,
-			RM:  b2 & 0b111,
-		},
-		internalBytes: []byte{b1, b2},
+		data:          data,
+		internalBytes: internalBytes,
 		printFunc:     printFunc,
 	}, nil
 }
@@ -81,7 +118,7 @@ func opcodeHandler_ImmediateToRegister(b1, b2 byte, bs *bytes.ByteStream) (Instr
 	}
 
 	printFunc := func(gi *genericInstruction) string {
-		dst := InterpretRegister(gi.data.REG, gi.data.W)
+		dst := InterpretREG(gi.data.REG, gi.data.W)
 
 		if !gi.data.W {
 			return fmt.Sprintf("mov %s, %d", dst, gi.internalBytes[1])

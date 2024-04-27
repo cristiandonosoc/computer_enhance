@@ -1,6 +1,6 @@
 package intel8086
 
-import ()
+import "fmt"
 
 type Register string
 
@@ -54,7 +54,7 @@ type RegisterWord byte
 
 const ()
 
-func InterpretRegister(reg byte, w bool) Register {
+func InterpretREG(reg byte, w bool) Register {
 	index := reg & 0b111
 
 	if !w {
@@ -62,4 +62,52 @@ func InterpretRegister(reg byte, w bool) Register {
 	} else {
 		return kRegistersWord[index]
 	}
+}
+
+// Effective Address Calculator --------------------------------------------------------------------
+
+type EAC string
+
+const (
+	EAC_Invalid       = "<invalid>"
+	EAC_BXSI          = "bx + si"
+	EAC_BXDI          = "bx + di"
+	EAC_BPSI          = "bp + si"
+	EAC_BPDI          = "bp + di"
+	EAC_SI            = "si"
+	EAC_DI            = "di"
+	EAC_BP            = "bp"
+	EAC_BX            = "bx"
+	EAC_DirectAddress = "<direct_access>"
+)
+
+var (
+	kEffectiveAddressCalculations = []EAC{
+		EAC_BXSI,          // 0b000
+		EAC_BXDI,          // 0b001
+		EAC_BPSI,          // 0b010
+		EAC_BPDI,          // 0b011
+		EAC_SI,            // 0b100
+		EAC_DI,            // 0b101
+		EAC_BP,            // 0b110
+		EAC_BX,            // 0b111
+		EAC_DirectAddress, // 0b110
+	}
+)
+
+func InterpretRM(rm byte, mod byte) EAC {
+	// Check for direct address mode.
+	if mod == 0b00 && rm == 0b110 {
+		return EAC_DirectAddress
+	}
+
+	return kEffectiveAddressCalculations[rm]
+}
+
+func ToEACNotation(eac EAC, offset uint16) string {
+	if offset == 0 {
+		return fmt.Sprintf("[%s]", eac)
+	}
+
+	return fmt.Sprintf("[%s + %d]", eac, offset)
 }
